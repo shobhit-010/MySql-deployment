@@ -42,10 +42,9 @@ pipeline {
                     sh "cp terraform/my-key.pem ansible/my-key.pem"
                     sh "chmod 600 ansible/my-key.pem"
 
-                    // Create SSH directory
-                    sh "mkdir -p ~/.ssh"
+                    // Create SSH config inside WORKSPACE, not in /var/lib/jenkins
+                    sh "mkdir -p ${env.WORKSPACE}/.ssh"
 
-                    // Create SSH config file dynamically
                     writeFile file: "${env.WORKSPACE}/.ssh/config", text: """
 Host bastion
     HostName ${BASTION_IP}
@@ -59,9 +58,10 @@ Host mysql-private
     ProxyJump bastion
 """
 
-                    sh "chmod 600 ~/.ssh/config"
+                    // Correct chmod path (workspace)
+                    sh "chmod 600 ${env.WORKSPACE}/.ssh/config"
 
-                    // Generate hosts.ini with ProxyJump host
+                    // Create hosts.ini for Ansible
                     writeFile file: 'ansible/hosts.ini', text: """
 [mysql]
 mysql-private ansible_user=ubuntu
@@ -74,7 +74,7 @@ mysql-private ansible_user=ubuntu
             steps {
                 sh '''
                 cd ansible
-                ansible-playbook -i hosts.ini mysql_install.yml
+                ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini mysql_install.yml
                 '''
             }
         }
