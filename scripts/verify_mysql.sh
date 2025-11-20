@@ -1,9 +1,11 @@
 #!/bin/bash
 set -e
 
-echo "Checking MySQL status..."
+WORKSPACE_DIR=$(pwd)
 
-ssh -F ~/.ssh/config mysql "sudo systemctl is-active mysql"
+echo "Checking MySQL service..."
+ssh -F $WORKSPACE_DIR/.ssh/config mysql "sudo systemctl is-active mysql"
 
-echo "Testing MySQL root login..."
-ssh -F ~/.ssh/config mysql "echo 'SHOW DATABASES;' | sudo mysql -u root -p1337"
+echo "Testing MySQL login..."
+ssh -F $WORKSPACE_DIR/.ssh/config mysql \
+"echo 'SHOW DATABASES;' | sudo mysql -u root -p1337"
