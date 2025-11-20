@@ -14,12 +14,16 @@ resource "tls_private_key" "generated" {
   rsa_bits  = 4096
 }
 
-resource "local_file" "private_key_pem" {
-  content         = tls_private_key.generated.private_key_pem
-  filename        = "./my-key.pem"
-  file_permission = "0600"
+resource "aws_key_pair" "ec2_key" {
+  key_name   = var.key_name
+  public_key = tls_private_key.generated.public_key_openssh
 }
 
+resource "local_file" "private_key_pem" {
+  content         = tls_private_key.generated.private_key_pem
+  filename        = "${path.module}/${var.key_name}.pem"
+  file_permission = "0600"
+}
 
 # -------------------------
 # VPC and Subnets
@@ -139,11 +143,11 @@ resource "aws_security_group" "db_sg" {
 
   }
   ingress {
-    from_port       = 22
-    to_port         = 22
-    protocol        = "tcp"
-    security_groups = [aws_security_group.bastion_sg.id]
-  }
+  from_port       = 22
+  to_port         = 22
+  protocol        = "tcp"
+  security_groups = [aws_security_group.bastion_sg.id]
+}
 
 
   egress {
@@ -175,32 +179,20 @@ data "aws_ami" "ubuntu" {
 resource "aws_instance" "bastion" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = var.instance_type
-  key_name = "my-key"
+  key_name                    = aws_key_pair.ec2_key.key_name
   subnet_id                   = aws_subnet.public.id
   vpc_security_group_ids      = [aws_security_group.bastion_sg.id]
   associate_public_ip_address = true
   tags                        = { Name = "bastion" }
-  user_data = <<EOF
-  #!/bin/bash
-  echo "Bastion started"
-  EOF
-
-
 }
 
 resource "aws_instance" "mysql" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = var.instance_type
-  key_name = "my-key"
+  key_name                    = aws_key_pair.ec2_key.key_name
   subnet_id                   = aws_subnet.private.id
   vpc_security_group_ids      = [aws_security_group.db_sg.id]
   associate_public_ip_address = false
   tags                        = { Name = "mysql-db" }
-  user_data = <<EOF
-  #!/bin/bash
-  echo "Bastion started"
-  EOF
-
-
 }
 
