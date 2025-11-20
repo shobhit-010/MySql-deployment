@@ -14,7 +14,49 @@ pipeline {
                 git url: 'https://github.com/shobhit-010/MySql-deployment.git'
             }
         }
-        stage('Terraform Init') {
+        
+       stage('Create S3 Bucket & DynamoDB Table (If Not Exists)') {
+    steps {
+        sh '''
+        
+        BUCKET="shobhit-mysql-tf-state"
+        TABLE="shobhit-mysql-tf-lock"
+        REGION="ap-south-1"
+
+        echo "Checking S3 bucket..."
+        if aws s3api head-bucket --bucket $BUCKET 2>/dev/null; then
+            echo "✔ Bucket already exists: $BUCKET"
+        else
+            echo "➕ Creating bucket: $BUCKET"
+            aws s3api create-bucket \
+                --bucket $BUCKET \
+                --region $REGION \
+                --create-bucket-configuration LocationConstraint=$REGION
+        fi
+
+        echo "Checking DynamoDB table..."
+        if aws dynamodb describe-table --table-name $TABLE --region $REGION 2>/dev/null; then
+            echo "✔ DynamoDB table already exists: $TABLE"
+        else
+            echo "➕ Creating DynamoDB table: $TABLE"
+            aws dynamodb create-table \
+                --table-name $TABLE \
+                --attribute-definitions AttributeName=LockID,AttributeType=S \
+                --key-schema AttributeName=LockID,KeyType=HASH \
+                --billing-mode PAY_PER_REQUEST \
+                --region $REGION
+        fi
+
+        echo "⏳ Waiting for DynamoDB table to become ACTIVE..."
+        aws dynamodb wait table-exists --table-name $TABLE --region $REGION
+
+        echo "✔ Backend resources ready!"
+        '''
+    }
+}
+
+
+    stage('Terraform Init') {
     steps {
         sh '''
         cd terraform
@@ -24,7 +66,7 @@ pipeline {
 }
 
         
-        stage('Terraform Apply (Only If No Infra Exists)') {
+    stage('Terraform Apply (Only If No Infra Exists)') {
     steps {
         script {
             def output = sh(
