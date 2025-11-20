@@ -1,1 +1,59 @@
 
+pipeline {
+    agent any
+
+    environment {
+        AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
+        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-key')
+        SSH_KEY               = credentials('bastion-key')
+    }
+
+    stages {
+
+        stage('Clone Repo') {
+            steps {
+                git 'git@github.com:shobhit-010/MySql-deployment.git'
+            }
+        }
+
+        stage('Terraform Init & Apply') {
+            steps {
+                sh '''
+                cd terraform
+                terraform init
+                terraform apply -auto-approve
+                '''
+            }
+        }
+
+        stage('Generate Dynamic Inventory') {
+            steps {
+                script {
+                    def MYSQL_IP = sh(
+                        script: "cd terraform && terraform output -raw mysql_private_ip",
+                        returnStdout: true
+                    ).trim()
+
+                    def BASTION_IP = sh(
+                        script: "cd terraform && terraform output -raw bastion_public_ip",
+                        returnStdout: true
+                    ).trim()
+
+                    writeFile file: 'ansible/hosts.ini', text: """
+[mysql]
+${MYSQL_IP} ansible_user=ubuntu ansible_ssh_common_args='-o ProxyCommand=\"ssh -i ~/.ssh/bastion.pem -W %h:%p ubuntu@${BASTION_IP}\"'
+"""
+                }
+            }
+        }
+
+        stage('Run Ansible') {
+            steps {
+                sh '''
+                cd ansible
+                ansible-playbook -i hosts.ini --private-key "$SSH_KEY" mysql_install.yml
+                '''
+            }
+        }
+    }
+}
