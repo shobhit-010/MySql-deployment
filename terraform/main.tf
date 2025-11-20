@@ -182,7 +182,7 @@ resource "aws_instance" "bastion" {
   tags                        = { Name = "bastion" }
 }
 
-resource "aws_instance" "mysql_db" {
+resource "aws_instance" "mysql" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = var.instance_type
   key_name                    = aws_key_pair.ec2_key.key_name
@@ -190,16 +190,5 @@ resource "aws_instance" "mysql_db" {
   vpc_security_group_ids      = [aws_security_group.db_sg.id]
   associate_public_ip_address = false
   tags                        = { Name = "mysql-db" }
-}
-
-# -------------------------
-# Outputs
-# -------------------------
-output "bastion_public_ip" {
-  value = aws_instance.bastion.public_ip
-}
-
-output "private_key_path" {
-  value = local_file.private_key_pem.filename
 }
 
