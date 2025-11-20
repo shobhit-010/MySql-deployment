@@ -1,0 +1,11 @@
+*.pem
+hosts.ini
+*.key
+*.private
+*.retry
+
+terraform.tfstate
+terraform.tfstate.backup
+.terraform/
+*.hcl
+*.pem

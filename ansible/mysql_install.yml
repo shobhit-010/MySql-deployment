@@ -1,0 +1,64 @@
+---
+- name: Install MySQL on Master DB
+  hosts: mysql
+  become: yes
+
+  vars:
+    mysql_root_password: "1337"
+
+  tasks:
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install MySQL server
+      apt:
+        name:
+          - mysql-server
+          - python3-pymysql
+        state: present
+
+    - name: Ensure MySQL service is running
+      service:
+        name: mysql
+        state: started
+        enabled: yes
+
+    - name: Read debian maintenance user password
+      shell: "grep password /etc/mysql/debian.cnf | head -n1 | awk '{print $3}'"
+      register: debian_pwd
+
+    - name: Set MySQL root password using debian-sys-maint
+      shell: |
+        mysql -u debian-sys-maint -p{{ debian_pwd.stdout }} <<EOF
+        ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '{{ mysql_root_password }}';
+        FLUSH PRIVILEGES;
+        EOF
+      args:
+        executable: /bin/bash
+
+    - name: Remove anonymous MySQL users
+      community.mysql.mysql_user:
+        name: ''
+        host_all: yes
+        state: absent
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+
+    - name: Remove test database
+      community.mysql.mysql_db:
+        name: test
+        state: absent
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+
+    - name: Reload privilege tables
+      community.mysql.mysql_user:
+        name: root
+        host: localhost
+        password: "{{ mysql_root_password }}"
+        check_implicit_admin: yes
+        state: present
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
