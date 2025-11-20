@@ -24,59 +24,87 @@ pipeline {
             }
         }
 
-        stage('Prepare SSH Key & SSH Config & Inventory') {
+        stage('Prepare SSH Key, Config & Inventory') {
             steps {
                 script {
 
-                    def MYSQL_IP = sh(
-                        script: "cd terraform && terraform output -raw mysql_private_ip",
-                        returnStdout: true
-                    ).trim()
+                    def MYSQL_IP = sh(script: "cd terraform && terraform output -raw mysql_private_ip", returnStdout: true).trim()
+                    def BASTION_IP = sh(script: "cd terraform && terraform output -raw bastion_public_ip", returnStdout: true).trim()
 
-                    def BASTION_IP = sh(
-                        script: "cd terraform && terraform output -raw bastion_public_ip",
-                        returnStdout: true
-                    ).trim()
+                    // Copy TF generated key into workspace
+                    sh "cp terraform/my-key.pem my-key.pem"
+                    sh "chmod 600 my-key.pem"
 
-                    // Copy Terraform key to ansible/
-                    sh "cp terraform/my-key.pem ansible/my-key.pem"
-                    sh "chmod 600 ansible/my-key.pem"
-
-                    // Create SSH config inside WORKSPACE, not in /var/lib/jenkins
+                    // Create .ssh/config inside workspace
                     sh "mkdir -p ${env.WORKSPACE}/.ssh"
 
                     writeFile file: "${env.WORKSPACE}/.ssh/config", text: """
 Host bastion
     HostName ${BASTION_IP}
     User ubuntu
-    IdentityFile ${env.WORKSPACE}/ansible/my-key.pem
+    IdentityFile ${env.WORKSPACE}/my-key.pem
+    StrictHostKeyChecking no
 
-Host mysql-private
+Host mysql
     HostName ${MYSQL_IP}
     User ubuntu
-    IdentityFile ${env.WORKSPACE}/ansible/my-key.pem
+    IdentityFile ${env.WORKSPACE}/my-key.pem
     ProxyJump bastion
+    StrictHostKeyChecking no
 """
 
-                    // Correct chmod path (workspace)
                     sh "chmod 600 ${env.WORKSPACE}/.ssh/config"
 
-                    // Create hosts.ini for Ansible
                     writeFile file: 'ansible/hosts.ini', text: """
 [mysql]
-mysql-private ansible_user=ubuntu
+mysql
+
+[mysql:vars]
+ansible_user=ubuntu
+ansible_ssh_common_args='-F ${env.WORKSPACE}/.ssh/config'
+ansible_ssh_private_key_file=${env.WORKSPACE}/my-key.pem
 """
                 }
             }
         }
 
-        stage('Run Ansible') {
+        stage('Test SSH Connectivity') {
             steps {
-                sh '''
-                cd ansible
-                ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i hosts.ini mysql_install.yml
-                '''
+                sh """
+                echo "Testing SSH to private MySQL host..."
+                ssh -F ${env.WORKSPACE}/.ssh/config mysql echo "SSH OK"
+                """
             }
         }
+
+        stage('Run Ansible') {
+            steps {
+                sh """
+                cd ansible
+                ANSIBLE_HOST_KEY_CHECKING=False \
+                ansible-playbook -i hosts.ini mysql_install.yml
+                """
+            }
+        }
+        
+        stage('Verify MySQL Running') {
+    steps {
+        sh """
+        echo "Checking MySQL service status..."
+        ssh -F ${env.WORKSPACE}/.ssh/config mysql 'sudo systemctl is-active mysql'
+        """
+    }
+}
+
+stage('Test MySQL Root Login') {
+    steps {
+        sh """
+        echo "Testing MySQL Login..."
+        ssh -F ${env.WORKSPACE}/.ssh/config mysql "\
+        echo 'SHOW DATABASES;' | sudo mysql -u root -p1337"
+        """
+    }
+}
+
     }
 }
