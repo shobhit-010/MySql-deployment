@@ -2,6 +2,15 @@ provider "aws" {
   region = var.region
 }
 
+terraform {
+  backend "s3" {
+    bucket         = "shobhit-mysql-tf-state"
+    key            = "infra/terraform.tfstate"
+    region         = "ap-south-1"
+    dynamodb_table = "shobhit-mysql-tf-lock"
+  }
+}
+
 # -------------------------
 # SSH Key
 # -------------------------
@@ -143,11 +152,11 @@ resource "aws_security_group" "db_sg" {
 
   }
   ingress {
-  from_port       = 22
-  to_port         = 22
-  protocol        = "tcp"
-  security_groups = [aws_security_group.bastion_sg.id]
-}
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    security_groups = [aws_security_group.bastion_sg.id]
+  }
 
 
   egress {

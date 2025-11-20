@@ -2,6 +2,7 @@ pipeline {
     agent any
 
     environment {
+        // FIXED: Correct way to bind AWS credentials
         AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
         AWS_SECRET_ACCESS_KEY = credentials('aws-secret-key')
     }
@@ -18,7 +19,7 @@ pipeline {
             steps {
                 sh '''
                 cd terraform
-                terraform init
+                terraform init -reconfigure -input=false
                 terraform apply -auto-approve
                 '''
             }
@@ -31,11 +32,11 @@ pipeline {
                     def MYSQL_IP = sh(script: "cd terraform && terraform output -raw mysql_private_ip", returnStdout: true).trim()
                     def BASTION_IP = sh(script: "cd terraform && terraform output -raw bastion_public_ip", returnStdout: true).trim()
 
-                    // Copy TF generated key into workspace
+                    // Copy Terraform-generated private key
                     sh "cp terraform/my-key.pem my-key.pem"
                     sh "chmod 600 my-key.pem"
 
-                    // Create .ssh/config inside workspace
+                    // SSH config
                     sh "mkdir -p ${env.WORKSPACE}/.ssh"
 
                     writeFile file: "${env.WORKSPACE}/.ssh/config", text: """
@@ -55,6 +56,7 @@ Host mysql
 
                     sh "chmod 600 ${env.WORKSPACE}/.ssh/config"
 
+                    // Inventory file
                     writeFile file: 'ansible/hosts.ini', text: """
 [mysql]
 mysql
@@ -86,25 +88,25 @@ ansible_ssh_private_key_file=${env.WORKSPACE}/my-key.pem
                 """
             }
         }
-        
-        stage('Verify MySQL Running') {
-    steps {
-        sh """
-        echo "Checking MySQL service status..."
-        ssh -F ${env.WORKSPACE}/.ssh/config mysql 'sudo systemctl is-active mysql'
-        """
-    }
-}
 
-stage('Test MySQL Root Login') {
-    steps {
-        sh """
-        echo "Testing MySQL Login..."
-        ssh -F ${env.WORKSPACE}/.ssh/config mysql "\
-        echo 'SHOW DATABASES;' | sudo mysql -u root -p1337"
-        """
-    }
-}
+        stage('Verify MySQL Running') {
+            steps {
+                sh """
+                echo "Checking MySQL service status..."
+                ssh -F ${env.WORKSPACE}/.ssh/config mysql 'sudo systemctl is-active mysql'
+                """
+            }
+        }
+
+        stage('Test MySQL Root Login') {
+            steps {
+                sh """
+                echo "Testing MySQL Login..."
+                ssh -F ${env.WORKSPACE}/.ssh/config mysql "\
+                echo 'SHOW DATABASES;' | sudo mysql -u root -p1337"
+                """
+            }
+        }
 
     }
 }
