@@ -1,8 +1,18 @@
 #!/bin/bash
 set -e
 
-echo "Running Ansible playbook..."
-cd ansible
+echo "Generating Ansible inventory..."
 
-ANSIBLE_HOST_KEY_CHECKING=False \
-ansible-playbook -i hosts.ini mysql_install.yml
+WORKSPACE_DIR=$(pwd)
+
+cat <<EOF > ansible/hosts.ini
+[mysql]
+mysql
+
+[mysql:vars]
+ansible_user=ubuntu
+ansible_ssh_common_args="-F $WORKSPACE_DIR/.ssh/config"
+ansible_ssh_private_key_file=$WORKSPACE_DIR/my-key.pem
+EOF
+
+echo "✔ Inventory created!"
