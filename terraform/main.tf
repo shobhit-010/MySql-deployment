@@ -11,8 +11,12 @@ resource "tls_private_key" "generated" {
 }
 
 resource "aws_key_pair" "ec2_key" {
-  key_name   = var.key_name
+  key_name   = "${var.key_name}-${random_id.key.hex}"
   public_key = tls_private_key.generated.public_key_openssh
+}
+
+resource "random_id" "key" {
+  byte_length = 4
 }
 
 resource "local_file" "private_key_pem" {
