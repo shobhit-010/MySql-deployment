@@ -24,23 +24,47 @@ pipeline {
             }
         }
 
-        stage('Prepare SSH Key & Inventory') {
+        stage('Prepare SSH Key & SSH Config & Inventory') {
             steps {
                 script {
 
-                    def MYSQL_IP = sh(script: "cd terraform && terraform output -raw mysql_private_ip", returnStdout: true).trim()
-                    def BASTION_IP = sh(script: "cd terraform && terraform output -raw bastion_public_ip", returnStdout: true).trim()
+                    def MYSQL_IP = sh(
+                        script: "cd terraform && terraform output -raw mysql_private_ip",
+                        returnStdout: true
+                    ).trim()
 
-                    // Copy terraform-generated key into Ansible folder
+                    def BASTION_IP = sh(
+                        script: "cd terraform && terraform output -raw bastion_public_ip",
+                        returnStdout: true
+                    ).trim()
+
+                    // Copy Terraform key to ansible/
                     sh "cp terraform/my-key.pem ansible/my-key.pem"
                     sh "chmod 600 ansible/my-key.pem"
 
-                    writeFile file: 'ansible/hosts.ini', text: """
-[bastion]
-bastion ansible_host=${BASTION_IP} ansible_user=ubuntu ansible_ssh_private_key_file=my-key.pem
+                    // Create SSH directory
+                    sh "mkdir -p ~/.ssh"
 
+                    // Create SSH config file dynamically
+                    writeFile file: "${env.WORKSPACE}/.ssh/config", text: """
+Host bastion
+    HostName ${BASTION_IP}
+    User ubuntu
+    IdentityFile ${env.WORKSPACE}/ansible/my-key.pem
+
+Host mysql-private
+    HostName ${MYSQL_IP}
+    User ubuntu
+    IdentityFile ${env.WORKSPACE}/ansible/my-key.pem
+    ProxyJump bastion
+"""
+
+                    sh "chmod 600 ~/.ssh/config"
+
+                    // Generate hosts.ini with ProxyJump host
+                    writeFile file: 'ansible/hosts.ini', text: """
 [mysql]
-${MYSQL_IP} ansible_user=ubuntu ansible_ssh_private_key_file=my-key.pem ansible_ssh_common_args='-o ProxyJump=ubuntu@${BASTION_IP}'
+mysql-private ansible_user=ubuntu
 """
                 }
             }
