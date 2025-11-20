@@ -4,7 +4,6 @@ pipeline {
     environment {
         AWS_ACCESS_KEY_ID     = credentials('aws-access-key')
         AWS_SECRET_ACCESS_KEY = credentials('aws-secret-key')
-        SSH_KEY               = credentials('bastion-key')
     }
 
     stages {
@@ -25,22 +24,25 @@ pipeline {
             }
         }
 
-        stage('Generate Dynamic Inventory') {
+        stage('Prepare SSH Key & Inventory') {
             steps {
                 script {
-                    def MYSQL_IP = sh(
-                        script: "cd terraform && terraform output -raw mysql_private_ip",
-                        returnStdout: true
-                    ).trim()
 
-                    def BASTION_IP = sh(
-                        script: "cd terraform && terraform output -raw bastion_public_ip",
-                        returnStdout: true
-                    ).trim()
+                    // Fetch outputs
+                    def MYSQL_IP = sh(script: "cd terraform && terraform output -raw mysql_private_ip", returnStdout: true).trim()
+                    def BASTION_IP = sh(script: "cd terraform && terraform output -raw bastion_public_ip", returnStdout: true).trim()
 
+                    // Copy Terraform generated key to Ansible directory
+                    sh "cp terraform/my-key.pem ansible/my-key.pem"
+                    sh "chmod 600 ansible/my-key.pem"
+
+                    // Create hosts.ini
                     writeFile file: 'ansible/hosts.ini', text: """
+[bastion]
+bastion ansible_host=${BASTION_IP} ansible_user=ubuntu ansible_ssh_private_key_file=my-key.pem
+
 [mysql]
-${MYSQL_IP} ansible_user=ubuntu ansible_ssh_common_args='-o ProxyCommand=\"ssh -i ~/.ssh/bastion.pem -W %h:%p ubuntu@${BASTION_IP}\"'
+${MYSQL_IP} ansible_user=ubuntu ansible_ssh_private_key_file=my-key.pem ansible_ssh_common_args='-o ProxyJump=bastion'
 """
                 }
             }
@@ -50,7 +52,7 @@ ${MYSQL_IP} ansible_user=ubuntu ansible_ssh_common_args='-o ProxyCommand=\"ssh -
             steps {
                 sh '''
                 cd ansible
-                ansible-playbook -i hosts.ini --private-key "$SSH_KEY" mysql_install.yml
+                ansible-playbook -i hosts.ini mysql_install.yml
                 '''
             }
         }
