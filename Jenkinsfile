@@ -28,21 +28,19 @@ pipeline {
             steps {
                 script {
 
-                    // Fetch outputs
                     def MYSQL_IP = sh(script: "cd terraform && terraform output -raw mysql_private_ip", returnStdout: true).trim()
                     def BASTION_IP = sh(script: "cd terraform && terraform output -raw bastion_public_ip", returnStdout: true).trim()
 
-                    // Copy Terraform generated key to Ansible directory
+                    // Copy terraform-generated key into Ansible folder
                     sh "cp terraform/my-key.pem ansible/my-key.pem"
                     sh "chmod 600 ansible/my-key.pem"
 
-                    // Create hosts.ini
                     writeFile file: 'ansible/hosts.ini', text: """
 [bastion]
 bastion ansible_host=${BASTION_IP} ansible_user=ubuntu ansible_ssh_private_key_file=my-key.pem
 
 [mysql]
-${MYSQL_IP} ansible_user=ubuntu ansible_ssh_private_key_file=my-key.pem ansible_ssh_common_args='-o ProxyJump=bastion'
+${MYSQL_IP} ansible_user=ubuntu ansible_ssh_private_key_file=my-key.pem ansible_ssh_common_args='-o ProxyJump=ubuntu@${BASTION_IP}'
 """
                 }
             }
