@@ -182,11 +182,9 @@ resource "aws_instance" "bastion" {
   tags                        = { Name = "bastion" }
   user_data = <<EOF
   #!/bin/bash
-  mkdir -p /home/ubuntu/.ssh
-  echo "${tls_private_key.generated.public_key_openssh}" >> /home/ubuntu/.ssh/authorized_keys
-  chown -R ubuntu:ubuntu /home/ubuntu/.ssh
-  chmod 600 /home/ubuntu/.ssh/authorized_keys
+  echo "Bastion started"
   EOF
+
 
 }
 
@@ -198,14 +196,11 @@ resource "aws_instance" "mysql" {
   vpc_security_group_ids      = [aws_security_group.db_sg.id]
   associate_public_ip_address = false
   tags                        = { Name = "mysql-db" }
-  
   user_data = <<EOF
   #!/bin/bash
-  mkdir -p /home/ubuntu/.ssh
-  echo "${tls_private_key.generated.public_key_openssh}" >> /home/ubuntu/.ssh/authorized_keys
-  chown -R ubuntu:ubuntu /home/ubuntu/.ssh
-  chmod 600 /home/ubuntu/.ssh/authorized_keys
+  echo "Bastion started"
   EOF
+
 
 }
 
