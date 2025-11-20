@@ -14,16 +14,33 @@ pipeline {
                 git url: 'https://github.com/shobhit-010/MySql-deployment.git'
             }
         }
+        stage('Terraform Init') {
+    steps {
+        sh '''
+        cd terraform
+        terraform init -reconfigure -input=false
+        '''
+    }
+}
 
-        stage('Terraform Init & Apply') {
-            steps {
-                sh '''
-                cd terraform
-                terraform init -reconfigure -input=false
-                terraform apply -auto-approve
-                '''
+        
+        stage('Terraform Apply (Only If No Infra Exists)') {
+    steps {
+        script {
+            def output = sh(
+                script: "cd terraform && terraform state list || true",
+                returnStdout: true
+            ).trim()
+
+            if (output == "") {
+                echo "✔ No infra found — creating infra now..."
+                sh "cd terraform && terraform apply -auto-approve"
+            } else {
+                echo "✔ Infra already exists — skipping Terraform apply."
             }
         }
+    }
+}
 
         stage('Prepare SSH Key, Config & Inventory') {
             steps {
