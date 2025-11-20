@@ -14,10 +14,12 @@ resource "tls_private_key" "generated" {
   rsa_bits  = 4096
 }
 
-resource "aws_key_pair" "ec2_key" {
-  key_name   = var.key_name
-  public_key = tls_private_key.generated.public_key_openssh
+resource "local_file" "private_key_pem" {
+  content         = tls_private_key.generated.private_key_pem
+  filename        = "./my-key.pem"
+  file_permission = "0600"
 }
+
 
 resource "local_file" "private_key_pem" {
   content         = tls_private_key.generated.private_key_pem
@@ -143,11 +145,11 @@ resource "aws_security_group" "db_sg" {
 
   }
   ingress {
-  from_port       = 22
-  to_port         = 22
-  protocol        = "tcp"
-  security_groups = [aws_security_group.bastion_sg.id]
-}
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    security_groups = [aws_security_group.bastion_sg.id]
+  }
 
 
   egress {
@@ -184,6 +186,13 @@ resource "aws_instance" "bastion" {
   vpc_security_group_ids      = [aws_security_group.bastion_sg.id]
   associate_public_ip_address = true
   tags                        = { Name = "bastion" }
+  user_data = <<EOF
+  #!/bin/bash
+  mkdir -p /home/ubuntu/.ssh
+  echo "${tls_private_key.generated.public_key_openssh}" >> /home/ubuntu/.ssh/authorized_keys
+  chown -R ubuntu:ubuntu /home/ubuntu/.ssh
+  chmod 600 /home/ubuntu/.ssh/authorized_keys
+  EOF
 }
 
 resource "aws_instance" "mysql" {
@@ -194,5 +203,13 @@ resource "aws_instance" "mysql" {
   vpc_security_group_ids      = [aws_security_group.db_sg.id]
   associate_public_ip_address = false
   tags                        = { Name = "mysql-db" }
+
+  user_data = <<EOF
+  #!/bin/bash
+  mkdir -p /home/ubuntu/.ssh
+  echo "${tls_private_key.generated.public_key_openssh}" >> /home/ubuntu/.ssh/authorized_keys
+  chown -R ubuntu:ubuntu /home/ubuntu/.ssh
+  chmod 600 /home/ubuntu/.ssh/authorized_keys
+EOF
 }
 
