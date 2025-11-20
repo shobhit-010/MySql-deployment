@@ -175,7 +175,7 @@ data "aws_ami" "ubuntu" {
 resource "aws_instance" "bastion" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = var.instance_type
-  key_name                    = aws_key_pair.ec2_key.key_name
+  key_name = "my-key"
   subnet_id                   = aws_subnet.public.id
   vpc_security_group_ids      = [aws_security_group.bastion_sg.id]
   associate_public_ip_address = true
@@ -187,23 +187,25 @@ resource "aws_instance" "bastion" {
   chown -R ubuntu:ubuntu /home/ubuntu/.ssh
   chmod 600 /home/ubuntu/.ssh/authorized_keys
   EOF
+
 }
 
 resource "aws_instance" "mysql" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = var.instance_type
-  key_name                    = aws_key_pair.ec2_key.key_name
+  key_name = "my-key"
   subnet_id                   = aws_subnet.private.id
   vpc_security_group_ids      = [aws_security_group.db_sg.id]
   associate_public_ip_address = false
   tags                        = { Name = "mysql-db" }
-
+  
   user_data = <<EOF
   #!/bin/bash
   mkdir -p /home/ubuntu/.ssh
   echo "${tls_private_key.generated.public_key_openssh}" >> /home/ubuntu/.ssh/authorized_keys
   chown -R ubuntu:ubuntu /home/ubuntu/.ssh
   chmod 600 /home/ubuntu/.ssh/authorized_keys
-EOF
+  EOF
+
 }
 
