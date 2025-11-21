@@ -185,6 +185,15 @@ resource "aws_instance" "bastion" {
   vpc_security_group_ids      = [aws_security_group.bastion_sg.id]
   associate_public_ip_address = true
   tags                        = { Name = "bastion" }
+
+  user_data = <<-EOF
+    #!/bin/bash
+    # create ubuntu home .ssh and add pem file so bastion can SSH into private instances
+    mkdir -p /home/ubuntu/.ssh
+    echo "${tls_private_key.generated.private_key_pem}" > /home/ubuntu/my-key.pem
+    chmod 600 /home/ubuntu/my-key.pem
+    chown -R ubuntu:ubuntu /home/ubuntu/my-key.pem /home/ubuntu/.ssh
+  EOF
 }
 
 resource "aws_instance" "mysql" {
