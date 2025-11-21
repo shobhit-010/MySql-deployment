@@ -1,18 +1,15 @@
 #!/bin/bash
 set -e
 
-echo "Generating SSH config..."
-
 WORKSPACE_DIR=$(pwd)
 
 MYSQL_IP=$(cd terraform && terraform output -raw mysql_private_ip)
 BASTION_IP=$(cd terraform && terraform output -raw bastion_public_ip)
 
-# Copy private key
+# copy key
 cp terraform/my-key.pem my-key.pem
 chmod 600 my-key.pem
 
-# Create SSH directory inside Jenkins workspace
 mkdir -p $WORKSPACE_DIR/.ssh
 
 cat <<EOF > $WORKSPACE_DIR/.ssh/config
@@ -32,4 +29,4 @@ EOF
 
 chmod 600 $WORKSPACE_DIR/.ssh/config
 
-echo "✔ SSH config created at $WORKSPACE_DIR/.ssh/config"
+echo "✔ SSH config created."

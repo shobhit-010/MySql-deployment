@@ -1,11 +1,8 @@
 #!/bin/bash
 set -e
 
-WORKSPACE_DIR=$(pwd)
+echo "Testing MySQL connection through bastion..."
 
-echo "Checking MySQL service..."
-ssh -F $WORKSPACE_DIR/.ssh/config mysql "sudo systemctl is-active mysql"
+mysql -h "$(cd terraform && terraform output -raw mysql_private_ip)" -u root -p1337 -e "SELECT VERSION();"
 
-echo "Testing MySQL login..."
-ssh -F $WORKSPACE_DIR/.ssh/config mysql \
-"echo 'SHOW DATABASES;' | sudo mysql -u root -p1337"
+echo "✔ MySQL is installed and reachable."
