@@ -1,18 +1,16 @@
 #!/bin/bash
 set -e
 
-echo "Testing MySQL connection THROUGH BASTION → PRIVATE"
-
 WORKSPACE_DIR=$(pwd)
 
-ssh -F $WORKSPACE_DIR/.ssh/config bastion <<EOF
-  echo "Connected to Bastion"
+echo "Checking MySQL service..."
+ssh -F $WORKSPACE_DIR/.ssh/config mysql "sudo systemctl is-active mysql"
 
-  ssh -F $WORKSPACE_DIR/.ssh/config mysql <<EOF2
-    echo "Connected to Private MySQL Instance"
-    mysql -u root -p1337 -e "SHOW DATABASES;"
-EOF2
-
-EOF
-
-echo "✔ SUCCESS: MySQL reachable through Bastion → Private"
+echo "Testing MySQL login..."
+ssh -F $WORKSPACE_DIR/.ssh/config mysql \
+"echo 'SHOW DATABASES;' | sudo mysql -u root -p1337"
+~                                                                                                         
+~                                                                                                         
+~                                                                                                         
+~                                                                                                         
+~    
