@@ -3,11 +3,12 @@ set -e
 
 echo "Testing MySQL connection THROUGH BASTION → PRIVATE"
 
-# First SSH to bastion, then from bastion SSH to private EC2, then run MySQL
-ssh bastion <<'EOF'
+WORKSPACE_DIR=$(pwd)
+
+ssh -F $WORKSPACE_DIR/.ssh/config bastion <<EOF
   echo "Connected to Bastion"
 
-  ssh mysql <<'EOF2'
+  ssh -F $WORKSPACE_DIR/.ssh/config mysql <<EOF2
     echo "Connected to Private MySQL Instance"
     mysql -u root -p1337 -e "SHOW DATABASES;"
 EOF2
