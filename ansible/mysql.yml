@@ -1,18 +1,1 @@
-- hosts: mysql 
-  become: yes
-  tasks:
-    - name: Update apt cache
-      apt:
-        update_cache: yes
-
-    - name: Install MySQL server
-      apt:
-        name: mysql-server
-        state: present
-
-    - name: Ensure MySQL is running
-      service:
-        name: mysql
-        state: started
-        enabled: yes
 
